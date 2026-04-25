@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Cercle Festival 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#08080f;--surface:#111122;--surface2:#1a1a30;
+  --accent:#c8a96e;--accent2:#7b6fd4;
+  --text:#f0ede8;--muted:#666;--border:rgba(200,169,110,0.2);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{color:var(--text);font-family:'Space Grotesk',sans-serif}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:rgba(8,8,15,0.97);
+  border-bottom:1px solid var(--border);z-index:100;flex-shrink:0;
+}
+.logo{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase}
+.logo span{color:var(--muted)}
+.badge{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);padding:5px 12px;border-radius:20px;font-size:12px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 2s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* MAP CONTAINER */
+#map-wrap{
+  flex:1;min-height:0;position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);cursor:crosshair;
+}
+#world-svg{
+  width:100%;height:100%;
+  user-select:none;-webkit-user-select:none;
+  touch-action:none;
+}
+/* pays */
+#world-svg path{fill:#1a1f35;stroke:#0d1020;stroke-width:0.3;transition:fill 0.15s}
+#world-svg path:hover{fill:#252c48}
+#world-svg path.selected{fill:#2a2010}
+
+/* PINS */
+.pin-dot{
+  position:absolute;pointer-events:none;
+  width:12px;height:12px;border-radius:50%;
+  transform:translate(-50%,-50%);
+  border:2px solid #c8a96e;background:rgba(200,169,110,0.45);
+  box-shadow:0 0 6px rgba(200,169,110,0.5);
+}
+.pin-dot.ig{border-color:#fd1d1d;background:rgba(253,29,29,0.4);box-shadow:0 0 6px rgba(253,29,29,0.4)}
+
+/* TEMP PIN (draggable) */
+#temp-pin{
+  position:absolute;display:none;
+  width:26px;height:26px;border-radius:50%;
+  transform:translate(-50%,-50%);
+  border:2.5px solid var(--accent);background:rgba(200,169,110,0.45);
+  box-shadow:0 0 0 8px rgba(200,169,110,0.1);
+  cursor:grab;z-index:10;
+}
+#temp-pin.dragging{cursor:grabbing;box-shadow:0 0 0 12px rgba(200,169,110,0.08)}
+
+/* HINT */
+#hint{
+  position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+  background:rgba(17,17,34,0.93);border:1px solid var(--border);
+  border-radius:24px;padding:9px 18px;font-size:13px;color:var(--muted);
+  pointer-events:none;white-space:nowrap;transition:opacity 0.3s;z-index:5;
+}
+#hint strong{color:var(--accent)}
+#hint.gone{opacity:0;pointer-events:none}
+
+/* VALIDATE BAR */
+#vbar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(8,8,15,0.97);border-top:1px solid var(--accent);
+  padding:12px 16px 22px;z-index:200;
+  display:flex;align-items:center;gap:10px;
+  transform:translateY(110%);transition:transform 0.3s cubic-bezier(0.34,1.4,0.64,1);
+}
+#vbar.up{transform:translateY(0)}
+#vbar .loc{flex:1;min-width:0}
+#vbar .loc b{display:block;font-size:16px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vbar .loc span{font-size:12px;color:var(--muted)}
+.btn-x{background:none;border:none;color:var(--muted);font-size:26px;line-height:1;cursor:pointer;padding:2px 6px;flex-shrink:0}
+.btn-ok{background:var(--accent);color:#000;border:none;border-radius:12px;padding:12px 18px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:transform 0.1s,background 0.1s}
+.btn-ok:active{transform:scale(0.95);background:#d4b87a}
+
+/* DIM */
+#dim{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:300;pointer-events:none;transition:background 0.3s}
+#dim.on{background:rgba(0,0,0,0.65);pointer-events:all}
+
+/* LOGIN SHEET */
+#sheet{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--surface);border-top:1px solid var(--border);
+  border-radius:20px 20px 0 0;padding:0 20px 38px;z-index:400;
+  transform:translateY(110%);transition:transform 0.38s cubic-bezier(0.34,1.15,0.64,1);
+  max-height:90dvh;overflow-y:auto;
+}
+#sheet.up{transform:translateY(0)}
+.handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 20px}
+.flag{font-size:40px;text-align:center;margin-bottom:8px;line-height:1}
+.stitle{font-size:22px;font-weight:600;text-align:center;margin-bottom:6px;line-height:1.2}
+.ssub{font-size:14px;color:var(--muted);text-align:center;margin-bottom:24px;line-height:1.5}
+
+.btn-ig{
+  width:100%;padding:15px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045);
+  color:#fff;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-bottom:10px;transition:opacity 0.15s,transform 0.1s;
+}
+.btn-ig:active{opacity:0.85;transform:scale(0.97)}
+.or-row{display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:12px}
+.or-row::before,.or-row::after{content:'';flex:1;height:1px;background:var(--border)}
+.btn-gs{
+  width:100%;padding:15px;border-radius:12px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:500;
+  cursor:pointer;transition:border-color 0.15s,transform 0.1s;
+}
+.btn-gs:active{transform:scale(0.97);border-color:var(--accent)}
+
+.step{display:none}.step.on{display:block}
+input[type=text]{
+  width:100%;padding:14px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:12px;
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:16px;
+  outline:none;margin-bottom:10px;
+}
+input[type=text]:focus{border-color:var(--accent)}
+input[type=text]::placeholder{color:var(--muted)}
+.btn-go{
+  width:100%;padding:15px;border-radius:12px;border:none;
+  background:var(--accent);color:#000;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;
+  cursor:pointer;transition:transform 0.1s;
+}
+.btn-go:active{transform:scale(0.97)}
+.btn-go:disabled{opacity:0.5}
+.btn-back{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;display:block;margin:10px auto 0;text-decoration:underline}
+
+/* TOAST */
+#toast{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-10px);
+  background:var(--surface2);border:1px solid var(--accent);border-radius:10px;
+  padding:9px 16px;font-size:13px;z-index:500;white-space:nowrap;
+  opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;
+}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast strong{color:var(--accent)}
+
+/* LEGEND */
+#legend{
+  position:fixed;bottom:28px;right:14px;
+  background:rgba(17,17,34,0.93);border:1px solid var(--border);border-radius:10px;
+  padding:9px 13px;font-size:11px;z-index:5;
+}
+.li{display:flex;align-items:center;gap:6px;color:var(--muted);margin-bottom:4px}
+.li:last-child{margin:0}
+.ld{width:8px;height:8px;border-radius:50%;border:2px solid;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">CERCLE <span>/ 2026</span></div>
+    <div class="badge"><div class="dot"></div><span id="cnt">0</span>&nbsp;origins</div>
+  </header>
+  <div id="map-wrap">
+    <!-- SVG monde simplifié - Natural Earth -->
+    <svg id="world-svg" viewBox="0 0 2000 1001" xmlns="http://www.w3.org/2000/svg">
+      <!-- Océan -->
+      <rect width="2000" height="1001" fill="#040a1a"/>
+      <!-- Continents simplifiés en paths -->
+      <!-- Amérique du Nord -->
+      <path id="NA" d="M 220,80 L 480,70 L 520,100 L 540,150 L 510,200 L 480,220 L 500,260 L 480,300 L 440,340 L 400,380 L 370,420 L 350,460 L 310,480 L 280,460 L 250,430 L 220,400 L 190,360 L 160,320 L 140,280 L 130,240 L 150,200 L 170,160 L 200,120 Z"/>
+      <!-- Mexique + Amérique centrale -->
+      <path id="MX" d="M 280,460 L 310,480 L 330,510 L 320,540 L 300,560 L 280,550 L 260,530 L 250,500 L 260,470 Z"/>
+      <!-- Amérique du Sud -->
+      <path id="SA" d="M 320,540 L 380,530 L 430,550 L 460,580 L 480,630 L 490,680 L 480,730 L 460,780 L 430,820 L 400,850 L 370,860 L 340,840 L 310,800 L 290,760 L 280,710 L 275,660 L 280,610 L 290,570 L 300,550 Z"/>
+      <!-- Europe occidentale -->
+      <path id="EU" d="M 860,120 L 920,110 L 970,120 L 990,150 L 980,180 L 960,200 L 940,220 L 910,230 L 880,220 L 860,200 L 840,180 L 840,155 L 850,135 Z"/>
+      <!-- Scandinavie -->
+      <path id="SC" d="M 920,60 L 960,50 L 990,80 L 980,110 L 960,120 L 930,115 L 910,95 L 900,75 Z"/>
+      <!-- Europe de l'Est / Russie ouest -->
+      <path id="RU" d="M 990,80 L 1200,50 L 1400,60 L 1500,80 L 1520,120 L 1480,160 L 1400,180 L 1300,190 L 1200,185 L 1100,180 L 1020,170 L 990,150 L 985,120 Z"/>
+      <!-- Russie est (Sibérie) -->
+      <path id="RU2" d="M 1500,80 L 1700,60 L 1850,70 L 1920,100 L 1900,140 L 1840,160 L 1750,170 L 1650,175 L 1550,170 L 1500,155 L 1490,130 Z"/>
+      <!-- Afrique du Nord -->
+      <path id="AN" d="M 860,280 L 1060,270 L 1120,290 L 1130,330 L 1110,360 L 1060,370 L 990,370 L 940,360 L 900,350 L 860,340 L 845,310 Z"/>
+      <!-- Afrique sub-saharienne -->
+      <path id="AF" d="M 860,340 L 1060,370 L 1110,400 L 1120,440 L 1110,490 L 1090,540 L 1060,590 L 1020,630 L 980,660 L 950,680 L 920,670 L 890,640 L 870,600 L 850,560 L 840,510 L 840,460 L 845,410 L 850,370 Z"/>
+      <!-- Moyen-Orient -->
+      <path id="ME" d="M 1060,270 L 1160,260 L 1210,280 L 1220,320 L 1200,360 L 1160,380 L 1120,370 L 1110,330 L 1100,290 Z"/>
+      <!-- Asie du Sud (Inde) -->
+      <path id="IN" d="M 1210,280 L 1320,270 L 1360,300 L 1370,340 L 1350,390 L 1310,430 L 1270,460 L 1240,450 L 1220,420 L 1210,380 L 1205,330 L 1205,300 Z"/>
+      <!-- Asie du Sud-Est -->
+      <path id="SEA" d="M 1500,300 L 1580,290 L 1620,320 L 1620,360 L 1590,390 L 1550,400 L 1510,380 L 1490,350 L 1490,320 Z"/>
+      <!-- Chine / Asie Est -->
+      <path id="CN" d="M 1360,180 L 1550,170 L 1620,200 L 1640,240 L 1620,290 L 1580,320 L 1510,340 L 1450,330 L 1400,310 L 1360,280 L 1350,240 L 1350,205 Z"/>
+      <!-- Japon -->
+      <path id="JP" d="M 1650,175 L 1680,180 L 1700,210 L 1690,240 L 1665,245 L 1645,225 L 1640,200 Z"/>
+      <!-- Australie -->
+      <path id="AU" d="M 1560,560 L 1700,540 L 1790,570 L 1830,620 L 1820,680 L 1780,730 L 1720,750 L 1650,740 L 1590,710 L 1550,660 L 1540,610 L 1545,575 Z"/>
+      <!-- Nouvelle-Zélande -->
+      <path id="NZ" d="M 1830,700 L 1860,710 L 1865,740 L 1845,755 L 1825,745 L 1820,720 Z"/>
+      <!-- Madagascar -->
+      <path id="MG" d="M 1080,560 L 1100,550 L 1115,575 L 1110,610 L 1090,625 L 1070,610 L 1065,580 Z"/>
+      <!-- Groenland -->
+      <path id="GL" d="M 400,20 L 500,15 L 540,40 L 530,70 L 490,85 L 440,80 L 400,60 L 385,40 Z"/>
+      <!-- Alaska -->
+      <path id="AK" d="M 100,80 L 200,60 L 230,85 L 220,110 L 190,125 L 150,120 L 110,105 Z"/>
+      <!-- Islande -->
+      <path id="IS" d="M 760,90 L 800,80 L 820,100 L 810,120 L 780,130 L 755,118 L 748,100 Z"/>
+      <!-- UK / Irlande -->
+      <path id="UK" d="M 840,130 L 870,120 L 885,140 L 875,165 L 855,170 L 838,155 L 833,140 Z"/>
+      <!-- Péninsule ibérique -->
+      <path id="IB" d="M 830,195 L 870,185 L 895,200 L 900,230 L 880,250 L 850,255 L 828,240 L 820,215 Z"/>
+    </svg>
+    <div id="temp-pin"></div>
+    <div id="hint"><strong>Tap</strong> the map — drop your pin</div>
+  </div>
+</div>
+
+<div id="vbar">
+  <button class="btn-x" onclick="cancelPin()">×</button>
+  <div class="loc">
+    <b id="loc-city">…</b>
+    <span id="loc-country"></span>
+  </div>
+  <button class="btn-ok" onclick="openSheet()">I'm from here →</button>
+</div>
+
+<div id="dim" onclick="closeSheet()"></div>
+
+<div id="sheet">
+  <div class="handle"></div>
+  <div id="s0" class="step on">
+    <div class="flag" id="s-flag">🌍</div>
+    <div class="stitle" id="s-title">Where are you from?</div>
+    <div class="ssub" id="s-sub">2 seconds to mark your hometown</div>
+    <button class="btn-ig" onclick="goIg()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="flex-shrink:0"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      <span id="s-ig-btn">Log in with Instagram</span>
+    </button>
+    <div class="or-row"><span id="s-or">or</span></div>
+    <button class="btn-gs" onclick="goGuest()" id="s-gs-btn">Continue as guest</button>
+  </div>
+
+  <div id="s1" class="step">
+    <div class="stitle" id="s-ig-title">Instagram</div>
+    <div class="ssub" id="s-ig-sub">Your handle</div>
+    <input type="text" id="ig-val" placeholder="@yourhandle" maxlength="30" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+    <button class="btn-go" id="ig-go" onclick="submitIg()">Confirm →</button>
+    <button class="btn-back" id="ig-back" onclick="goS0()">← Back</button>
+  </div>
+
+  <div id="s2" class="step">
+    <div class="stitle" id="s-gs-title">Your name</div>
+    <div class="ssub" id="s-gs-sub">First name or nickname</div>
+    <input type="text" id="gs-val" placeholder="Alex" maxlength="30" autocomplete="given-name"/>
+    <button class="btn-go" id="gs-go" onclick="submitGuest()">Let's go →</button>
+    <button class="btn-back" id="gs-back" onclick="goS0()">← Back</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="legend">
+  <div class="li"><div class="ld" style="border-color:#c8a96e;background:rgba(200,169,110,0.35)"></div>Guest</div>
+  <div class="li"><div class="ld" style="border-color:#fd1d1d;background:rgba(253,29,29,0.3)"></div>Instagram</div>
+</div>
+
+<script>
+const SB_URL = 'https://boocsyyzaygrppmxeazq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvb2NzeXl6YXlncnBwbXhlYXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTYxNDgsImV4cCI6MjA5MjYzMjE0OH0.nOwfqAhMjloAnsnMHX0j8eElJ0nki90qWR9vGPOtUt4';
+
+// ── Langues ─────────────────────────────────────────────────
+const LANGS = {
+  FR:['🇫🇷','D\'où viens-tu ?','2 secondes pour te localiser','Instagram','Invité','ou','← Retour','Valider →','Ton pseudo Insta','Ton prénom'],
+  DE:['🇩🇪','Woher kommst du?','2 Sekunden für deinen Pin','Instagram','Als Gast','oder','← Zurück','Bestätigen →','Instagram-Name','Vorname'],
+  ES:['🇪🇸','¿De dónde eres?','2 segundos para tu pin','Instagram','Invitado','o','← Volver','Confirmar →','Tu usuario','Tu nombre'],
+  IT:['🇮🇹','Da dove vieni?','2 secondi per il tuo pin','Instagram','Ospite','o','← Indietro','Conferma →','Username','Il tuo nome'],
+  PT:['🇧🇷','De onde você é?','2 segundos para seu pin','Instagram','Convidado','ou','← Voltar','Confirmar →','Seu usuário','Seu nome'],
+  NL:['🇳🇱','Waar kom je vandaan?','2 seconden voor jouw pin','Instagram','Gast','of','← Terug','Bevestigen →','Jouw naam','Voornaam'],
+  PL:['🇵🇱','Skąd jesteś?','2 sekundy na Twój pin','Instagram','Gość','lub','← Wróć','Potwierdź →','Twój nick','Twoje imię'],
+  SE:['🇸🇪','Varifrån kommer du?','2 sekunder för din pin','Instagram','Gäst','eller','← Tillbaka','Bekräfta →','Ditt konto','Ditt namn'],
+  NO:['🇳🇴','Hvor er du fra?','2 sekunder for pin','Instagram','Gjest','eller','← Tilbake','Bekreft →','Din konto','Ditt navn'],
+  JP:['🇯🇵','どこから？','2秒でピン','Instagram','ゲスト','または','← 戻る','確認 →','アカウント','お名前'],
+  KR:['🇰🇷','어디서 왔나요?','2초로 핀 표시','Instagram','게스트','또는','← 뒤로','확인 →','계정','이름'],
+  CN:['🇨🇳','你来自哪里？','两秒标记城市','Instagram','访客','或','← 返回','确认 →','账号','姓名'],
+  AR:['🇸🇦','من أين أنت؟','ثانيتان لوضع دبوسك','Instagram','ضيف','أو','رجوع ←','تأكيد','حسابك','اسمك'],
+  RU:['🇷🇺','Откуда ты?','2 секунды для пина','Instagram','Гость','или','← Назад','Подтвердить →','Ник','Имя'],
+  TR:['🇹🇷','Nereden geliyorsun?','2 saniyede pin bırak','Instagram','Misafir','veya','← Geri','Onayla →','Hesabın','Adın'],
+};
+const COUNTRY_LANG = {
+  'France':'FR','Germany':'DE','Spain':'ES','Italy':'IT','Portugal':'PT','Brazil':'PT',
+  'Netherlands':'NL','Belgium':'NL','Poland':'PL','Sweden':'SE','Norway':'NO','Denmark':'NO',
+  'Japan':'JP','South Korea':'KR','China':'CN',
+  'Saudi Arabia':'AR','United Arab Emirates':'AR','Morocco':'AR','Algeria':'AR',
+  'Russia':'RU','Turkey':'TR','Mexico':'ES','Colombia':'ES','Argentina':'ES','Chile':'ES',
+  'Austria':'DE','Switzerland':'DE','Luxembourg':'FR',
+};
+const DEF = ['🌍','Where are you from?','2 seconds to drop your pin','Instagram','Guest','or','← Back','Confirm →','Your handle','Your name'];
+
+// Correspondance id SVG → pays
+const SVG_COUNTRIES = {
+  NA:'United States', MX:'Mexico', SA:'Brazil', EU:'France', SC:'Sweden',
+  RU:'Russia', RU2:'Russia', AN:'Egypt', AF:'Nigeria', ME:'Saudi Arabia',
+  IN:'India', SEA:'Thailand', CN:'China', JP:'Japan', AU:'Australia',
+  NZ:'New Zealand', MG:'Madagascar', GL:'Greenland', AK:'United States',
+  IS:'Iceland', UK:'United Kingdom', IB:'Spain',
+};
+
+let db = null;
+let tempPct = null; // {px, py} en % du SVG
+let geoData = {};
+let curLang = DEF;
+let isDragging = false;
+let dragOffset = {x:0, y:0};
+const mapWrap = document.getElementById('map-wrap');
+const tempPin = document.getElementById('temp-pin');
+
+// ── Gestion SVG : clic et hover ─────────────────────────────
+document.getElementById('world-svg').addEventListener('click', function(e) {
+  const pct = svgPercent(e);
+  if (!pct) return;
+  placePin(pct, e.clientX, e.clientY);
+  // Tente de détecter le pays depuis le path cliqué
+  const path = e.target.closest('path');
+  if (path && SVG_COUNTRIES[path.id]) {
+    const country = SVG_COUNTRIES[path.id];
+    geoData = { city: '', country };
+    setLoc(country, '');
+    const lk = COUNTRY_LANG[country] || 'DEFAULT';
+    curLang = LANGS[lk] || DEF;
+  } else {
+    reverseGeocode(pct);
+  }
+});
+
+// ── Place le pin temporaire ─────────────────────────────────
+function placePin(pct, cx, cy) {
+  tempPct = pct;
+  updatePinPos(pct);
+  tempPin.style.display = 'block';
+  document.getElementById('vbar').classList.add('up');
+  document.getElementById('hint').classList.add('gone');
+}
+
+function updatePinPos(pct) {
+  const rect = mapWrap.getBoundingClientRect();
+  tempPin.style.left = (pct.x * rect.width / 100) + 'px';
+  tempPin.style.top  = (pct.y * rect.height / 100) + 'px';
+}
+
+// ── Drag du pin ─────────────────────────────────────────────
+tempPin.addEventListener('pointerdown', function(e) {
+  e.stopPropagation();
+  isDragging = true;
+  tempPin.classList.add('dragging');
+  tempPin.setPointerCapture(e.pointerId);
+});
+tempPin.addEventListener('pointermove', function(e) {
+  if (!isDragging) return;
+  const rect = mapWrap.getBoundingClientRect();
+  const x = Math.max(0, Math.min(100, (e.clientX - rect.left) / rect.width * 100));
+  const y = Math.max(0, Math.min(100, (e.clientY - rect.top)  / rect.height * 100));
+  tempPct = {x, y};
+  updatePinPos(tempPct);
+  setLoc('…', '');
+});
+tempPin.addEventListener('pointerup', function(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  tempPin.classList.remove('dragging');
+  reverseGeocode(tempPct);
+});
+
+// ── Convertit un event en % de la carte ────────────────────
+function svgPercent(e) {
+  const rect = mapWrap.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) / rect.width * 100,
+    y: (e.clientY - rect.top)  / rect.height * 100,
+  };
+}
+
+// Convertit % en coordonnées lat/lng approx (projection équirectangulaire)
+function pctToLatLng(pct) {
+  const lng = (pct.x / 100) * 360 - 180;
+  const lat = 90 - (pct.y / 100) * 180;
+  return { lat, lng };
+}
+
+function cancelPin() {
+  tempPin.style.display = 'none';
+  tempPct = null; geoData = {};
+  document.getElementById('vbar').classList.remove('up');
+  document.getElementById('hint').classList.remove('gone');
+}
+
+// ── Géocodage inverse ───────────────────────────────────────
+function reverseGeocode(pct) {
+  setLoc('…','');
+  const {lat, lng} = pctToLatLng(pct);
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`)
+    .then(r => r.json())
+    .then(d => {
+      const city    = d.address?.city || d.address?.town || d.address?.village || d.address?.county || '';
+      const country = d.address?.country || '';
+      geoData = { city, country };
+      setLoc(city || country || '?', city ? country : '');
+      const lk = COUNTRY_LANG[country] || 'DEFAULT';
+      curLang = LANGS[lk] || DEF;
+    })
+    .catch(() => { geoData={}; setLoc('Unknown location',''); });
+}
+
+function setLoc(city, country) {
+  document.getElementById('loc-city').textContent    = city;
+  document.getElementById('loc-country').textContent = country;
+}
+
+// ── Sheet ───────────────────────────────────────────────────
+function openSheet() {
+  const L = curLang;
+  document.getElementById('s-flag').textContent    = L[0];
+  document.getElementById('s-title').textContent   = L[1];
+  document.getElementById('s-sub').textContent     = L[2];
+  document.getElementById('s-ig-btn').textContent  = L[3];
+  document.getElementById('s-gs-btn').textContent  = L[4];
+  document.getElementById('s-or').textContent      = L[5];
+  document.getElementById('ig-go').textContent     = L[7];
+  document.getElementById('ig-back').textContent   = L[6];
+  document.getElementById('ig-val').placeholder    = '@' + L[8];
+  document.getElementById('gs-go').textContent     = L[7];
+  document.getElementById('gs-back').textContent   = L[6];
+  document.getElementById('gs-val').placeholder    = L[9];
+  goS0();
+  document.getElementById('sheet').classList.add('up');
+  document.getElementById('dim').classList.add('on');
+  document.getElementById('vbar').classList.remove('up');
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('up');
+  document.getElementById('dim').classList.remove('on');
+  if (tempPct) document.getElementById('vbar').classList.add('up');
+}
+
+function goS0()  { ['s0','s1','s2'].forEach(i=>document.getElementById(i).classList.remove('on')); document.getElementById('s0').classList.add('on'); }
+function goIg()  { ['s0','s1','s2'].forEach(i=>document.getElementById(i).classList.remove('on')); document.getElementById('s1').classList.add('on'); setTimeout(()=>document.getElementById('ig-val').focus(),80); }
+function goGuest(){ ['s0','s1','s2'].forEach(i=>document.getElementById(i).classList.remove('on')); document.getElementById('s2').classList.add('on'); setTimeout(()=>document.getElementById('gs-val').focus(),80); }
+
+// ── Submit ──────────────────────────────────────────────────
+async function submitIg() {
+  const raw = document.getElementById('ig-val').value.trim();
+  if (!raw) return;
+  await savePin(raw.startsWith('@') ? raw : '@'+raw, 'instagram', 'ig-go');
+}
+async function submitGuest() {
+  const n = document.getElementById('gs-val').value.trim();
+  if (!n) return;
+  await savePin(n, 'guest', 'gs-go');
+}
+
+async function savePin(name, type, btnId) {
+  if (!tempPct) return;
+  const btn = document.getElementById(btnId);
+  btn.disabled = true; btn.textContent = '…';
+  const {lat, lng} = pctToLatLng(tempPct);
+  const pin = { lat, lng, name, type, city:geoData.city||'', country:geoData.country||'' };
+
+  if (db) {
+    const { error } = await db.from('pins').insert([pin]);
+    if (error) { showToast('Error — try again'); btn.disabled=false; btn.textContent=curLang[7]; return; }
+  } else {
+    addDot(tempPct, type, name, geoData.city||geoData.country||'?');
+    document.getElementById('cnt').textContent = parseInt(document.getElementById('cnt').textContent)+1;
+    showToast(`<strong>${esc(name)}</strong> · ${esc(geoData.city||geoData.country||'?')}`);
+  }
+
+  tempPin.style.display='none'; tempPct=null; geoData={};
+  document.getElementById('ig-val').value='';
+  document.getElementById('gs-val').value='';
+  btn.disabled=false; btn.textContent=curLang[7];
+  closeSheet();
+  document.getElementById('hint').classList.remove('gone');
+}
+
+// ── Affiche un dot permanent sur la carte ───────────────────
+function addDot(pct, type, name, loc) {
+  const dot = document.createElement('div');
+  dot.className = 'pin-dot' + (type==='instagram' ? ' ig' : '');
+  dot.style.left = pct.x + '%';
+  dot.style.top  = pct.y + '%';
+  dot.title = `${name} · ${loc}`;
+  mapWrap.appendChild(dot);
+}
+
+// Convertit lat/lng en % pour afficher les pins chargés depuis Supabase
+function latLngToPct(lat, lng) {
+  return {
+    x: (lng + 180) / 360 * 100,
+    y: (90 - lat) / 180 * 100,
+  };
+}
+
+// ── Toast ───────────────────────────────────────────────────
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.innerHTML=msg; t.classList.add('on');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('on'),3000);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ── Supabase en différé ─────────────────────────────────────
+(function(){
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  s.onload=function(){
+    try {
+      db = supabase.createClient(SB_URL, SB_KEY);
+      db.from('pins').select('*').order('created_at').then(({data,error})=>{
+        if(error||!data) return;
+        data.forEach(p => addDot(latLngToPct(p.lat,p.lng), p.type, p.name, p.city||p.country||'?'));
+        document.getElementById('cnt').textContent = data.length;
+      });
+      db.channel('pins-live')
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'pins'}, p=>{
+          addDot(latLngToPct(p.new.lat,p.new.lng), p.new.type, p.new.name, p.new.city||p.new.country||'?');
+          document.getElementById('cnt').textContent=parseInt(document.getElementById('cnt').textContent)+1;
+          showToast(`<strong>${esc(p.new.name)}</strong> · ${esc(p.new.city||p.new.country||'?')}`);
+        })
+        .subscribe();
+    } catch(e){ console.warn('Supabase error:',e); }
+  };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
